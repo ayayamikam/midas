@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title></title>
+
+  <style>
+    /* כל הדף לבן נקי */
+    body {
+      margin: 0;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* הקנבס של הגל */
+    #wave {
+      width: 90vw;
+      max-width: 800px;
+      height: 120px;
+      display: block;
+    }
+
+    /* כפתור "הפעל" יופיע רק אם הדפדפן חוסם autoplay במובייל.
+       הוא שקוף בלי גבולות כדי לא להרוס את המינימליזם,
+       אבל עדיין מאפשר לאדם לגעת במסך כדי להתחיל את הצליל. */
+    #tapToPlay {
+      position: fixed;
+      inset: 0;
+      background: transparent;
+      border: none;
+      font-size: 0;
+      color: transparent;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- קנבס לגל -->
+  <canvas id="wave"></canvas>
+
+  <!-- אודיו -->
+  <audio id="audio" src="https://vocaroo.com/1aEdVcp1oxaT" preload="auto"></audio>
+
+  <!-- כפתור הפעלה שקוף לחלוטין (נשתמש בו רק אם צריך) -->
+  <button id="tapToPlay" aria-label="play audio"></button>
+
+  <script>
+    // -------------------------------------------------
+    // הגדרות בסיס
+    // -------------------------------------------------
+    const audioEl = document.getElementById('audio');
+    const canvas = document.getElementById('wave');
+    const ctx = canvas.getContext('2d');
+    const tapBtn = document.getElementById('tapToPlay');
+
+    function resizeCanvas() {
+      // נשמור חדות גבוהה גם במסך רטינה
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth;
+      const cssH = canvas.clientHeight;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // -------------------------------------------------
+    // "גל": נבנה וקטור של נקודות שמייצגות waveform.
+    // כאן אני יוצר waveform סינתטי חלק עם תנודות - 
+    // זה מה שיופיע ויזואלית.
+    // אפשר להחליף אחר כך ל-waveform האמיתי שלך מדגימה.
+    // -------------------------------------------------
+    const POINTS = 200; // כמה דגימות לרוחב
+    let baseWave = [];
+    for (let i = 0; i < POINTS; i++) {
+      // נבנה גל עם רנדום עדין כדי שיראה אורגני ולא מחשבוני מדי
+      const t = i / (POINTS - 1);
+      const noise = (Math.random() * 0.4 - 0.2); // רעידה עדינה
+      const shape = Math.sin(t * Math.PI * 2 * 1.5) * 0.6; // תדר בסיס
+      baseWave.push(shape * 0.6 + noise * 0.4);
+    }
+
+    // -------------------------------------------------
+    // אנימציה: נגרום לגל להתנענע באטיות,
+    // לא כמו אקולייזר קופצני אלא כמו נשימה.
+    // -------------------------------------------------
+    let t0 = performance.now();
+
+    function drawFrame(now) {
+      const elapsed = (now - t0) / 1000; // שניות
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#000000';
+
+      for (let i = 0; i < POINTS; i++) {
+        const x = (i / (POINTS - 1)) * w;
+
+        // נוסיף תנודה איטית בזמן, כדי שיראה חי
+        const breathe = Math.sin(elapsed * 0.8 + i * 0.15) * 0.07;
+
+        // ערך בסיס הגל + נשימה
+        const yNorm = baseWave[i] + breathe;
+
+        // נמקם את הגל אנכית באמצע הקנבס
+        const y = h / 2 + yNorm * (h * 0.35);
+
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+
+      ctx.stroke();
+      requestAnimationFrame(drawFrame);
+    }
+
+    requestAnimationFrame(drawFrame);
+
+    // -------------------------------------------------
+    // ננסה להפעיל אוטומטית.
+    // בדפדפנים רבים במובייל זה ייחסם עד שיש אינטראקציה אנושית.
+    // במקרה שזה נחסם - נשאיר כפתור שקוף על כל המסך:
+    // המשתמש רק נוגע במסך -> הסאונד מתחיל.
+    // -------------------------------------------------
+    function tryPlay() {
+      audioEl.play().then(() => {
+        // הצליח, אין צורך בכפתור
+        tapBtn.style.display = 'none';
+      }).catch(() => {
+        // נכשל (אוטופליי חסום), נשאיר את הכפתור השקוף.
+        tapBtn.style.display = 'block';
+      });
+    }
+
+    // ננסה כשנטען
+    document.addEventListener('DOMContentLoaded', () => {
+      tryPlay();
+    });
+
+    // אם המשתמש נוגע במסך — נפעיל
+    tapBtn.addEventListener('click', () => {
+      tryPlay();
+    });
+  </script>
+</body>
+</html>
