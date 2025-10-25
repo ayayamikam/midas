@@ -6,7 +6,6 @@
   <title></title>
 
   <style>
-    /* כל הדף לבן נקי */
     body {
       margin: 0;
       background: #ffffff;
@@ -17,9 +16,10 @@
       touch-action: manipulation;
       -webkit-user-select: none;
       user-select: none;
+      position: relative;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
-    /* הקנבס של הגל */
     #wave {
       width: 90vw;
       max-width: 800px;
@@ -27,10 +27,33 @@
       display: block;
     }
 
-    /* כפתור "הפעל" יופיע רק אם הדפדפן חוסם autoplay במובייל.
-       הוא שקוף בלי גבולות כדי לא להרוס את המינימליזם,
-       אבל עדיין מאפשר לאדם לגעת במסך כדי להתחיל את הצליל. */
-    #tapToPlay {
+    /* שכבת כפתור fallback: עיגול קטן שחור עם חץ לבן.
+       לא נראה עד שאנחנו צריכים אותו. */
+    #playButton {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000000;
+      color: #ffffff;
+      border: none;
+      font-size: 24px;
+      line-height: 56px;
+      text-align: center;
+      cursor: pointer;
+      padding: 0;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none; /* ברירת מחדל - מוסתר */
+    }
+
+    #playButton:active {
+      scale: 0.96;
+    }
+
+    /* אזור מגע שקוף על כל המסך - נשתמש בו כניסיון ראשון לנגן */
+    #tapArea {
       position: fixed;
       inset: 0;
       background: transparent;
@@ -43,118 +66,116 @@
 </head>
 <body>
 
-  <!-- קנבס לגל -->
+  <!-- קנבס של הגל -->
   <canvas id="wave"></canvas>
 
   <!-- אודיו -->
-  <audio id="audio" src="https://vocaroo.com/1aEdVcp1oxaT" preload="auto"></audio>
+  <audio
+    id="audio"
+    src="https://vocaroo.com/1aEdVcp1oxaT"
+    preload="auto">
+  </audio>
 
-  <!-- כפתור הפעלה שקוף לחלוטין (נשתמש בו רק אם צריך) -->
-  <button id="tapToPlay" aria-label="play audio"></button>
+  <!-- אזור מגע שקוף - ניסיון ראשוני -->
+  <button id="tapArea" aria-label="tap to play audio"></button>
+
+  <!-- fallback ויזואלי אם עדיין לא עובד -->
+  <button id="playButton" aria-label="play">▶︎</button>
 
   <script>
-    // -------------------------------------------------
-    // הגדרות בסיס
-    // -------------------------------------------------
     const audioEl = document.getElementById('audio');
     const canvas = document.getElementById('wave');
     const ctx = canvas.getContext('2d');
-    const tapBtn = document.getElementById('tapToPlay');
+    const tapArea = document.getElementById('tapArea');
+    const playButton = document.getElementById('playButton');
 
+    // ---------- ציור הגל ----------
     function resizeCanvas() {
-      // נשמור חדות גבוהה גם במסך רטינה
       const dpr = window.devicePixelRatio || 1;
       const cssW = canvas.clientWidth;
       const cssH = canvas.clientHeight;
       canvas.width = cssW * dpr;
       canvas.height = cssH * dpr;
+      ctx.setTransform(1,0,0,1,0,0); // reset scale לפני שמגדילים שוב
       ctx.scale(dpr, dpr);
     }
-
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // -------------------------------------------------
-    // "גל": נבנה וקטור של נקודות שמייצגות waveform.
-    // כאן אני יוצר waveform סינתטי חלק עם תנודות - 
-    // זה מה שיופיע ויזואלית.
-    // אפשר להחליף אחר כך ל-waveform האמיתי שלך מדגימה.
-    // -------------------------------------------------
-    const POINTS = 200; // כמה דגימות לרוחב
+    const POINTS = 200;
     let baseWave = [];
     for (let i = 0; i < POINTS; i++) {
-      // נבנה גל עם רנדום עדין כדי שיראה אורגני ולא מחשבוני מדי
       const t = i / (POINTS - 1);
-      const noise = (Math.random() * 0.4 - 0.2); // רעידה עדינה
-      const shape = Math.sin(t * Math.PI * 2 * 1.5) * 0.6; // תדר בסיס
+      const noise = (Math.random() * 0.4 - 0.2);
+      const shape = Math.sin(t * Math.PI * 2 * 1.5) * 0.6;
       baseWave.push(shape * 0.6 + noise * 0.4);
     }
 
-    // -------------------------------------------------
-    // אנימציה: נגרום לגל להתנענע באטיות,
-    // לא כמו אקולייזר קופצני אלא כמו נשימה.
-    // -------------------------------------------------
     let t0 = performance.now();
 
     function drawFrame(now) {
-      const elapsed = (now - t0) / 1000; // שניות
+      const elapsed = (now - t0) / 1000;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      ctx.clearRect(0, 0, w, h);
 
+      ctx.clearRect(0, 0, w, h);
       ctx.beginPath();
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#000000';
 
       for (let i = 0; i < POINTS; i++) {
         const x = (i / (POINTS - 1)) * w;
-
-        // נוסיף תנודה איטית בזמן, כדי שיראה חי
         const breathe = Math.sin(elapsed * 0.8 + i * 0.15) * 0.07;
-
-        // ערך בסיס הגל + נשימה
         const yNorm = baseWave[i] + breathe;
-
-        // נמקם את הגל אנכית באמצע הקנבס
         const y = h / 2 + yNorm * (h * 0.35);
 
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-
       ctx.stroke();
       requestAnimationFrame(drawFrame);
     }
-
     requestAnimationFrame(drawFrame);
 
-    // -------------------------------------------------
-    // ננסה להפעיל אוטומטית.
-    // בדפדפנים רבים במובייל זה ייחסם עד שיש אינטראקציה אנושית.
-    // במקרה שזה נחסם - נשאיר כפתור שקוף על כל המסך:
-    // המשתמש רק נוגע במסך -> הסאונד מתחיל.
-    // -------------------------------------------------
-    function tryPlay() {
-      audioEl.play().then(() => {
-        // הצליח, אין צורך בכפתור
-        tapBtn.style.display = 'none';
-      }).catch(() => {
-        // נכשל (אוטופליי חסום), נשאיר את הכפתור השקוף.
-        tapBtn.style.display = 'block';
-      });
+    // ---------- לוגיקת אודיו ----------
+    // נסיון ראשון לנגן מיד כשיש מגע במסך
+    async function tryPlayDirect() {
+      try {
+        await audioEl.play();
+        // אם הצליח:
+        tapArea.style.display = 'none';
+        playButton.style.display = 'none';
+      } catch (err) {
+        // אם נכשל (אייפון עדיין חוסם):
+        // נציג את הכפתור השחור באמצע.
+        playButton.style.display = 'block';
+      }
     }
 
-    // ננסה כשנטען
+    // נסה לנגן מיד כשהעמוד נטען (יעבוד אולי בדסקטופ/אנדרואיד)
     document.addEventListener('DOMContentLoaded', () => {
-      tryPlay();
+      tryPlayDirect();
     });
 
-    // אם המשתמש נוגע במסך — נפעיל
-    tapBtn.addEventListener('click', () => {
-      tryPlay();
+    // טאץ' בכל המסך
+    tapArea.addEventListener('click', () => {
+      tryPlayDirect();
+    });
+    tapArea.addEventListener('touchstart', () => {
+      tryPlayDirect();
+    }, {passive:true});
+
+    // ואם זה עדיין לא עבד, לחיצה על העיגול ▶︎ תנגן בוודאות
+    playButton.addEventListener('click', async () => {
+      try {
+        await audioEl.play();
+        tapArea.style.display = 'none';
+        playButton.style.display = 'none';
+      } catch(e){
+        // אם גם פה לא עובד - זה אומר שספארי לא אוהב את המקור (CORS / cross-origin)
+        // במקרה הזה נדבר על שלב ב': לארח את האודיו אצלך במקום Vocaroo.
+        console.log("audio still blocked", e);
+      }
     });
   </script>
 </body>
