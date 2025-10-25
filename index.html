@@ -6,176 +6,58 @@
   <title></title>
 
   <style>
-    body {
+    html, body {
       margin: 0;
-      background: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      touch-action: manipulation;
-      -webkit-user-select: none;
-      user-select: none;
-      position: relative;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    #wave {
-      width: 90vw;
-      max-width: 800px;
-      height: 120px;
-      display: block;
-    }
-
-    /* שכבת כפתור fallback: עיגול קטן שחור עם חץ לבן.
-       לא נראה עד שאנחנו צריכים אותו. */
-    #playButton {
-      position: absolute;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: #000000;
-      color: #ffffff;
-      border: none;
-      font-size: 24px;
-      line-height: 56px;
-      text-align: center;
-      cursor: pointer;
       padding: 0;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      display: none; /* ברירת מחדל - מוסתר */
+      background: #ffffff;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
     }
 
-    #playButton:active {
-      scale: 0.96;
-    }
-
-    /* אזור מגע שקוף על כל המסך - נשתמש בו כניסיון ראשון לנגן */
-    #tapArea {
-      position: fixed;
-      inset: 0;
-      background: transparent;
-      border: none;
-      font-size: 0;
-      color: transparent;
+    /* עיצוב מינימליסטי לנגן */
+    audio {
+      width: 320px;
+      max-width: 85vw;
+      outline: none;
+      filter: invert(1) contrast(0) brightness(0.3);
+      opacity: 1;
+      transition: opacity 0.3s ease;
       cursor: pointer;
+    }
+
+    audio::-webkit-media-controls-panel {
+      background: transparent;
     }
   </style>
 </head>
+
 <body>
-
-  <!-- קנבס של הגל -->
-  <canvas id="wave"></canvas>
-
-  <!-- אודיו -->
-  <audio
-    id="audio"
-   src="https://raw.githubusercontent.com/ayayamikam/midas/main/midas.m4a"
-    preload="auto">
+  <audio id="soundPlayer" controls preload="auto">
+    <source src="https://raw.githubusercontent.com/ayayamikam/midas/main/midas.m4a" type="audio/mp4" />
+    הדפדפן שלך אינו תומך בניגון קבצי שמע.
   </audio>
 
-  <!-- אזור מגע שקוף - ניסיון ראשוני -->
-  <button id="tapArea" aria-label="tap to play audio"></button>
-
-  <!-- fallback ויזואלי אם עדיין לא עובד -->
-  <button id="playButton" aria-label="play">▶︎</button>
-
   <script>
-    const audioEl = document.getElementById('audio');
-    const canvas = document.getElementById('wave');
-    const ctx = canvas.getContext('2d');
-    const tapArea = document.getElementById('tapArea');
-    const playButton = document.getElementById('playButton');
+    const player = document.getElementById("soundPlayer");
 
-    // ---------- ציור הגל ----------
-    function resizeCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      const cssW = canvas.clientWidth;
-      const cssH = canvas.clientHeight;
-      canvas.width = cssW * dpr;
-      canvas.height = cssH * dpr;
-      ctx.setTransform(1,0,0,1,0,0); // reset scale לפני שמגדילים שוב
-      ctx.scale(dpr, dpr);
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    const POINTS = 200;
-    let baseWave = [];
-    for (let i = 0; i < POINTS; i++) {
-      const t = i / (POINTS - 1);
-      const noise = (Math.random() * 0.4 - 0.2);
-      const shape = Math.sin(t * Math.PI * 2 * 1.5) * 0.6;
-      baseWave.push(shape * 0.6 + noise * 0.4);
-    }
-
-    let t0 = performance.now();
-
-    function drawFrame(now) {
-      const elapsed = (now - t0) / 1000;
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-
-      ctx.clearRect(0, 0, w, h);
-      ctx.beginPath();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#000000';
-
-      for (let i = 0; i < POINTS; i++) {
-        const x = (i / (POINTS - 1)) * w;
-        const breathe = Math.sin(elapsed * 0.8 + i * 0.15) * 0.07;
-        const yNorm = baseWave[i] + breathe;
-        const y = h / 2 + yNorm * (h * 0.35);
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      requestAnimationFrame(drawFrame);
-    }
-    requestAnimationFrame(drawFrame);
-
-    // ---------- לוגיקת אודיו ----------
-    // נסיון ראשון לנגן מיד כשיש מגע במסך
-    async function tryPlayDirect() {
-      try {
-        await audioEl.play();
-        // אם הצליח:
-        tapArea.style.display = 'none';
-        playButton.style.display = 'none';
-      } catch (err) {
-        // אם נכשל (אייפון עדיין חוסם):
-        // נציג את הכפתור השחור באמצע.
-        playButton.style.display = 'block';
-      }
-    }
-
-    // נסה לנגן מיד כשהעמוד נטען (יעבוד אולי בדסקטופ/אנדרואיד)
-    document.addEventListener('DOMContentLoaded', () => {
-      tryPlayDirect();
+    // לוודא שהנגן נשאר גלוי וניתן ללחוץ שוב
+    player.addEventListener("ended", () => {
+      // מחזירים את הנגן למצב מוכן
+      player.currentTime = 0;
+      player.pause();
+      player.style.opacity = "1";
     });
 
-    // טאץ' בכל המסך
-    tapArea.addEventListener('click', () => {
-      tryPlayDirect();
+    // אם מישהו לחץ על pause או סיים לשמוע – אין שינוי בתצוגה
+    player.addEventListener("pause", () => {
+      player.style.opacity = "1";
     });
-    tapArea.addEventListener('touchstart', () => {
-      tryPlayDirect();
-    }, {passive:true});
-
-    // ואם זה עדיין לא עבד, לחיצה על העיגול ▶︎ תנגן בוודאות
-    playButton.addEventListener('click', async () => {
-      try {
-        await audioEl.play();
-        tapArea.style.display = 'none';
-        playButton.style.display = 'none';
-      } catch(e){
-        // אם גם פה לא עובד - זה אומר שספארי לא אוהב את המקור (CORS / cross-origin)
-        // במקרה הזה נדבר על שלב ב': לארח את האודיו אצלך במקום Vocaroo.
-        console.log("audio still blocked", e);
-      }
+    player.addEventListener("play", () => {
+      player.style.opacity = "1";
     });
   </script>
 </body>
