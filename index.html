@@ -9,55 +9,65 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: #ffffff;
       height: 100%;
       width: 100%;
+      background: #ffffff;
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden;
     }
 
-    /* עיצוב מינימליסטי לנגן */
-    audio {
-      width: 320px;
-      max-width: 85vw;
-      outline: none;
-      filter: invert(1) contrast(0) brightness(0.3);
-      opacity: 1;
-      transition: opacity 0.3s ease;
+    /* העיגול השחור עם הסמל ▶︎ */
+    #playButton {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: #000000;
+      color: #ffffff;
+      border: none;
+      font-size: 32px;
+      line-height: 70px;
+      text-align: center;
       cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      user-select: none;
     }
 
-    audio::-webkit-media-controls-panel {
-      background: transparent;
+    #playButton:active {
+      transform: scale(0.95);
     }
   </style>
 </head>
 
 <body>
-  <audio id="soundPlayer" controls preload="auto">
+  <button id="playButton">▶︎</button>
+
+  <audio id="audio" preload="auto">
     <source src="https://raw.githubusercontent.com/ayayamikam/midas/main/midas.m4a" type="audio/mp4" />
     הדפדפן שלך אינו תומך בניגון קבצי שמע.
   </audio>
 
   <script>
-    const player = document.getElementById("soundPlayer");
+    const btn = document.getElementById("playButton");
+    const audio = document.getElementById("audio");
 
-    // לוודא שהנגן נשאר גלוי וניתן ללחוץ שוב
-    player.addEventListener("ended", () => {
-      // מחזירים את הנגן למצב מוכן
-      player.currentTime = 0;
-      player.pause();
-      player.style.opacity = "1";
+    // כשנוגעים בכפתור - מנגנים או עוצרים
+    btn.addEventListener("click", async () => {
+      try {
+        if (audio.paused) {
+          await audio.play();
+        } else {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      } catch (err) {
+        console.error("בעיה בהשמעה:", err);
+      }
     });
 
-    // אם מישהו לחץ על pause או סיים לשמוע – אין שינוי בתצוגה
-    player.addEventListener("pause", () => {
-      player.style.opacity = "1";
-    });
-    player.addEventListener("play", () => {
-      player.style.opacity = "1";
+    // כשמסתיים – חוזר למצב מוכן
+    audio.addEventListener("ended", () => {
+      audio.currentTime = 0;
     });
   </script>
 </body>
